@@ -15,26 +15,34 @@ var md = new MarkdownIt('commonmark', {
                 return '<pre class="hljs"><code>' +
                     hljs.highlight(str, {language: lang}).value +
                     '</code></pre>';
-            } catch (__) {}
+            } catch (__) {
+            }
         }
 
         return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
     }
 });
 
-// opts: --dark, --jump, --choosetheme
+// --dark, --jump, --choosetheme, --setinfolder [wharfolder], //TODO --hilight
 // faire un truc pour mettre les css et js dans un dossier
+// faire un spearator pour load que une partie
+
 
 function main() {
     let input = process.argv[2];
     let output = process.argv[3];
-    let opts = process.argv[3];
+    let setInFolder;
+    let whatfolder;
+    let imports = "";
     if (process.argv.includes('--help')) {
         console.log('Usage: node index.js inputfile [outputfile|0] [--help] [--version]');
         return;
     } else if (process.argv.includes('--version')) {
-        console.log('1.0.0');
+        console.log('1.0.1');
         return;
+    } else if (process.argv.includes('--setinfolder')) {
+        setInFolder = true;
+        whatfolder = process.argv[process.argv.indexOf('--setinfolder') + 1];
     }
     if (!input) {
         console.log('Usage: node index.js inputfile [outputfile|0] [--help] [--version]');
@@ -43,10 +51,6 @@ function main() {
     if (!output) {
         console.log('Usage: node index.js inputfile outputfile [--help] [--version]');
         return;
-    }
-    if (opts) {
-        opts = opts.split(',');
-        cssglobal = fs.readFileSync('./css/global.css', 'utf8');
     }
     fs.readFile(input, 'utf8', (err, data) => {
         if (err) throw err;
@@ -75,34 +79,50 @@ function main() {
         if (process.argv.includes('--jump')) {
             pagedata = pagedata.replace(/\n/g, '<br>');
         }
+
+        //<!--<link href="https://unpkg.com/@primer/css@^16.0.0/dist/primer.css" rel="stylesheet" />-->
+        //<!--<link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.4.0/styles/default.min.css">-->
+        if (pagehasmath) {
+            if (setInFolder) {
+                imports = `
+                    <link rel="stylesheet" href="${whatfolder+"/css/katex.min.css"}" integrity="sha384-MlJdn/WNKDGXveldHDdyRP1R4CTHr3FeuDNfhsLPYrq2t0UBkUdK2jyTnXPEK1NQ" crossorigin="anonymous">
+                    <script defer src="${whatfolder+"/js/katex.min.js"}" integrity="sha384-VQ8d8WVFw0yHhCk5E8I86oOhv48xLpnDZx5T9GogA/Y84DcCKWXDmSDfn13bzFZY" crossorigin="anonymous"></script>
+                    <script defer src="${whatfolder+"/js/auto-render.min.js"}" integrity="sha384-+XBljXPPiv+OzfbB3cVmLHf4hdUFHlWNZN5spNQ7rmHTXpd7WvJum6fIACpNNfIR" crossorigin="anonymous" onload="renderMathInElement(document.body);"/>
+                    <script defer src="${whatfolder+"/js/asciimath2tex.umd.js"}"</script>
+                `
+            } else {
+                imports = `
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.2/dist/katex.min.css" integrity="sha384-MlJdn/WNKDGXveldHDdyRP1R4CTHr3FeuDNfhsLPYrq2t0UBkUdK2jyTnXPEK1NQ" crossorigin="anonymous">
+                    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.2/dist/katex.min.js" integrity="sha384-VQ8d8WVFw0yHhCk5E8I86oOhv48xLpnDZx5T9GogA/Y84DcCKWXDmSDfn13bzFZY" crossorigin="anonymous"></script>
+                    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.2/dist/contrib/auto-render.min.js" integrity="sha384-+XBljXPPiv+OzfbB3cVmLHf4hdUFHlWNZN5spNQ7rmHTXpd7WvJum6fIACpNNfIR" crossorigin="anonymous" onload="renderMathInElement(document.body);"/>
+                    <script src="https://unpkg.com/asciimath2tex@1.2.1/dist/asciimath2tex.umd.js"></script>
+                `
+            }
+        }
+        if(setInFolder){
+            imports += `
+                <link rel="stylesheet" href="${whatfolder+"/css/primer.css"}">
+                <link rel="stylesheet" href="${whatfolder+"/css/highlightjs.css"}">
+                <link rel="stylesheet" href="${whatfolder+"/css/global.css"}">
+                <script src="${whatfolder+"/js/highlight.min.js"}"></script>
+            `
+        }else {
+            imports += `
+                <style>${fs.readFileSync("./css/primer.css", "utf-8")}</style>
+                <style>${fs.readFileSync('./css/highlightjs.css', 'utf8')};</style>
+                <style>${fs.readFileSync('./css/global.css', 'utf8')}</style>
+                <script src="https://unpkg.com/@highlightjs/cdn-assets@11.4.0/highlight.min.js"></script>
+            `
+        }
+        // imports = imports.replace(/[\r\n\t]/g, '')
+        // imports = imports.replace(/\s(\s)*/g, ' ')
         let base_html = `<!doctype html>
             <html lang="fr">
-            <!--themes:
-                Light               data-color-mode="light" data-light-theme="light"
-                Dark                data-color-mode="dark" data-dark-theme="dark"
-                Dark Dimmed         data-color-mode="dark" data-dark-theme="dark_dimmed"
-                Marche pas: Dark High Contrast  data-color-mode="dark" data-dark-theme="dark_high_contrast"
-            -->
             <head>
                 <meta charset="utf-8">
                 <title>Titre de la page</title>
                 <!-- Mettre tout ca dans un diossierr-->
-                ${pagehasmath ? `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.2/dist/katex.min.css" integrity="sha384-MlJdn/WNKDGXveldHDdyRP1R4CTHr3FeuDNfhsLPYrq2t0UBkUdK2jyTnXPEK1NQ" crossorigin="anonymous">
-                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.2/dist/katex.min.js" integrity="sha384-VQ8d8WVFw0yHhCk5E8I86oOhv48xLpnDZx5T9GogA/Y84DcCKWXDmSDfn13bzFZY" crossorigin="anonymous"></script>
-                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.2/dist/contrib/auto-render.min.js" integrity="sha384-+XBljXPPiv+OzfbB3cVmLHf4hdUFHlWNZN5spNQ7rmHTXpd7WvJum6fIACpNNfIR" crossorigin="anonymous" onload="renderMathInElement(document.body);"/>
-                <script src="https://unpkg.com/asciimath2tex@1.2.1/dist/asciimath2tex.umd.js"></script>` : ""}
-                <!--<link href="https://unpkg.com/@primer/css@^16.0.0/dist/primer.css" rel="stylesheet" />-->
-                <style>
-                    ${fs.readFileSync("./css/primer.css", "utf-8")}
-                </style>
-                <!--<link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.4.0/styles/default.min.css">-->
-                <style>
-                    ${fs.readFileSync('./css/highlightjs.css', 'utf8')};
-                
-                </style>
-                <script src="https://unpkg.com/@highlightjs/cdn-assets@11.4.0/highlight.min.js"></script>
-                
-                <style>${cssglobal}</style>
+                ${imports}
                 <script>
                     function changetheme(theme){
                         if(theme.substring(0,4) === 'dark'){
@@ -113,7 +133,7 @@ function main() {
                             document.documentElement.setAttribute("data-light-theme", theme);
                         }
                         document.cookie = "theme="+theme+"; path=/";
-                        hljs.highlightAll();
+                        //hljs.highlightAll();
                     }
                     function load_cookie(){
                         document.cookie.split(';').forEach(function(c) {
